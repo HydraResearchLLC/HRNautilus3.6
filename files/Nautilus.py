@@ -35,6 +35,9 @@ import copy
 import struct
 import time
 import configparser
+import requests
+import urllib
+import ssl
 
 from distutils.version import StrictVersion # for upgrade installations
 
@@ -66,7 +69,7 @@ class Nautilus(QObject, MeshWriter, Extension):
     # 1) here
     # 2) plugin.json
     # 3) package.json
-    version = "1.0.2"
+    version = "1.0.3"
 
     ##  Dictionary that defines how characters are escaped when embedded in
     #   g-code.
@@ -86,7 +89,7 @@ class Nautilus(QObject, MeshWriter, Extension):
         #self._application.initializationFinished.connect(self._onInitialized)
         #def _onInitialized(self):
         self.this_plugin_path=os.path.join(Resources.getStoragePath(Resources.Resources), "plugins","Nautilus","Nautilus")
-
+        self.gitUrl = 'https://api.github.com/repos/HydraResearchLLC/Nautilus-Config-Cura/releases/latest'
 
         self._preferences_window = None
 
@@ -119,10 +122,18 @@ class Nautilus(QObject, MeshWriter, Extension):
             self._application.getPreferences().addPreference("Nautilus/install_status", "unknown")
             Logger.log("i","1")
 
+        if self._application.getPreferences().getValue("Nautilus/configVersion") is None:
+            self._application.getPreferences().addPreference("Nautilus/configVersion","0.0")
+
+
         # if something got messed up, force installation
         if not self.isInstalled() and self._application.getPreferences().getValue("Nautilus/install_status") is "installed":
             self._application.getPreferences().setValue("Nautilus/install_status", "unknown")
             Logger.log("i","2")
+
+        if not self.isInstalled() and self._application.getPreferences().getValue("Nautilus/configVersion") is "installed":
+            self._application.getPreferences().setValue("Nautilus/configVersion", "0.0")
+
 
         # if it's installed, and it's listed as uninstalled, then change that to reflect the truth
         if self.isInstalled() and self._application.getPreferences().getValue("Nautilus/install_status") is "uninstalled":
@@ -133,6 +144,12 @@ class Nautilus(QObject, MeshWriter, Extension):
         if not self.versionsMatch():
             self._application.getPreferences().setValue("Nautilus/install_status", "unknown")
             Logger.log("i","4")
+
+        if not self.configVersionsMatch():
+            self._application.getPreferences().setValue("Nautilus/configVersion", "0.0")
+
+        if self._application.getPreferences().getValue("Nautilus/configVersion") is "0.0":
+            self.configDownload()
 
         # Check the preferences to see if the user uninstalled the files -
         # if so don't automatically install them
@@ -201,7 +218,7 @@ class Nautilus(QObject, MeshWriter, Extension):
     @pyqtProperty(str)
     def getVersion(self):
         numba = Nautilus.version
-        Logger.log("i","Nailed it!"+numba)
+        Logger.log("i","Nailed it! "+numba)
         return str(numba)
 
     def oldVersionInstalled(self):
@@ -236,7 +253,7 @@ class Nautilus(QObject, MeshWriter, Extension):
     def versionsMatch(self):
         # get the currently installed plugin version number
         if self._application.getPreferences().getValue("Nautilus/curr_version") is None:
-            self._application.getPreferences().addPreference("Nautilus/curr_version", "0.0.0")
+            self._application.getPreferences().addPreference("Nautilus/curr_version", "0.0")
 
         installedVersion = self._application.getPreferences().getValue("Nautilus/curr_version")
 
@@ -248,6 +265,38 @@ class Nautilus(QObject, MeshWriter, Extension):
             Logger.log("i", "Nautilus Plugin installed version: " +installedVersion+ " doesn't match this version: "+Nautilus.version)
             return False
 
+    def configVersionsMatch(self):
+        newVersion = json.loads(requests.get(self.gitUrl,auth=('zachrose@hydraresearch3d.com','Nautilus3d')).text)['tag_name']
+        installedVersion = self._application.getPreferences().getValue("Nautilus/configVersion")
+        if StrictVersion(installedVersion) == StrictVersion(newVersion):
+            Logger.log("i","Some stuff, it's chill")
+            return True
+        else:
+            Logger.log("i","Some stuff, it's not chill")
+            self.configDownload()
+            return False
+
+
+    def configDownload(self):
+        message = Message(catalog.i18nc("@info:status", "Downloading Config"))
+        message.show()
+        configUrl = json.loads(requests.get(self.gitUrl,auth=('zachrose@hydraresearch3d.com','Nautilus3d')).text)['assets'][0]['browser_download_url']
+        versionNo = json.loads(requests.get(self.gitUrl,auth=('zachrose@hydraresearch3d.com','Nautilus3d')).text)['tag_name']
+        Logger.log("i", "Downloading from " + str(configUrl))
+        Logger.log("i", "Downloading to " + str(self.this_plugin_path))
+        try:
+            if (not os.environ.get('PYTHONHTTPSVERIFY', '') and getattr(ssl, '_create_unverified_context', None)):
+                ssl._create_default_https_context = ssl._create_unverified_context
+            opener = urllib.request.build_opener()
+            opener.addheaders = [('Accept','application/octet-stream')]
+            urllib.request.install_opener(opener)
+            urllib.request.urlretrieve(configUrl,os.path.join(self.this_plugin_path,'Nautilus.zip'))
+            self._application.getPreferences().setValue("Nautilus/configVersion", versionNo)
+            Logger.log("i","Config Downloaded")
+        except Exception as inst:
+            Logger.log("i","There was an error connecting to github")
+            for err in inst:
+                Logger.log("i",err)
 
     # check to see if the plugin files are all installed
     def isInstalled(self):
@@ -305,6 +354,8 @@ class Nautilus(QObject, MeshWriter, Extension):
     # Install the plugin files.
     def installPluginFiles(self):
         Logger.log("i", "Nautilus Plugin installing printer files")
+        if not os.path.isfile(os.path.join(self.this_plugin_path,"Nautilus.zip")):
+            self.configDownload()
         upper = Upgrader.Upgrader()
         value = upper.configFixer()
         if value:
@@ -318,9 +369,9 @@ class Nautilus(QObject, MeshWriter, Extension):
                 for info in zip_ref.infolist():
                     Logger.log("i", "Nautilus Plugin: found in zipfile: " + info.filename )
                     folder = None
-                    if info.filename == "hydra_research_nautilus.def.json":
+                    if info.filename.endswith("nautilus.def.json"):
                         folder = self.local_printer_def_path
-                    elif info.filename == "hydra_research_nautilus_extruder.def.json":
+                    elif info.filename.endswith("hydra_research_nautilus_extruder.def.json"):
                         folder = self.local_extruder_path
                     elif info.filename.endswith("nautilus.cfg"):
                         folder = self.local_setvis_path
