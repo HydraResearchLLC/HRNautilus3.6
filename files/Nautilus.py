@@ -69,7 +69,7 @@ class Nautilus(QObject, MeshWriter, Extension):
     # 1) here
     # 2) plugin.json
     # 3) package.json
-    version = "1.0.3"
+    version = "1.0.10"
 
     ##  Dictionary that defines how characters are escaped when embedded in
     #   g-code.
@@ -122,18 +122,22 @@ class Nautilus(QObject, MeshWriter, Extension):
             self._application.getPreferences().addPreference("Nautilus/install_status", "unknown")
             Logger.log("i","1")
 
-        if self._application.getPreferences().getValue("Nautilus/configVersion") is None:
-            self._application.getPreferences().addPreference("Nautilus/configVersion","0.0")
+        if self._application.getPreferences().getValue("Nautilus/profile_status") is None:
+            self._application.getPreferences().addPreference("Nautilus/profile_status","unknown")
 
+        if self._application.getPreferences().getValue("Nautilus/configversion") is None:
+            self._application.getPreferences().addPreference("Nautilus/configversion","0.0")
+            Logger.log("i", "Config Version is" + self._application.getPreferences().getValue("Nautilus/configversion"))
+
+        if self._application.getPreferences().getValue("Nautilus/auto_status") is None:
+            self._application.getPreferences().addPreference("Nautilus/auto_status", "No")
+            self._application.getPreferences().setValue("Nautilus/auto_status", "No")
+            Logger.log("i","attempted adding preference")
 
         # if something got messed up, force installation
         if not self.isInstalled() and self._application.getPreferences().getValue("Nautilus/install_status") is "installed":
             self._application.getPreferences().setValue("Nautilus/install_status", "unknown")
             Logger.log("i","2")
-
-        if not self.isInstalled() and self._application.getPreferences().getValue("Nautilus/configVersion") is "installed":
-            self._application.getPreferences().setValue("Nautilus/configVersion", "0.0")
-
 
         # if it's installed, and it's listed as uninstalled, then change that to reflect the truth
         if self.isInstalled() and self._application.getPreferences().getValue("Nautilus/install_status") is "uninstalled":
@@ -145,11 +149,11 @@ class Nautilus(QObject, MeshWriter, Extension):
             self._application.getPreferences().setValue("Nautilus/install_status", "unknown")
             Logger.log("i","4")
 
-        if not self.configVersionsMatch():
-            self._application.getPreferences().setValue("Nautilus/configVersion", "0.0")
+        #if not self.configVersionsMatch():
+        #    self._application.getPreferences().setValue("Nautilus/configversion", "0.0")
 
-        if self._application.getPreferences().getValue("Nautilus/configVersion") is "0.0":
-            self.configDownload()
+        #if self._application.getPreferences().getValue("Nautilus/configversion") is "0.0":
+        #    self.configDownload()
 
         # Check the preferences to see if the user uninstalled the files -
         # if so don't automatically install them
@@ -158,6 +162,7 @@ class Nautilus(QObject, MeshWriter, Extension):
             Logger.log("i","5")
             self.installPluginFiles()
 
+        self.configVersionsMatch()
 
 
         Duet=NautilusDuet.NautilusDuet()
@@ -215,11 +220,42 @@ class Nautilus(QObject, MeshWriter, Extension):
             message.show()
         return
 
+    @pyqtSlot()
+    def changeAutoStatus(self):
+        if self._application.getPreferences().getValue("Nautilus/auto_status") == "Yes":
+            self._application.getPreferences().setValue("Nautilus/auto_status", "No")
+        elif self._application.getPreferences().getValue("Nautilus/auto_status") == "No":
+            self._application.getPreferences().setValue("Nautilus/auto_status", "Yes")
+        else:
+            Logger.log("i","something's broken")
+        return
+
     @pyqtProperty(str)
     def getVersion(self):
         numba = Nautilus.version
         Logger.log("i","Nailed it! "+numba)
         return str(numba)
+
+    @pyqtProperty(str)
+    def showUpdateButton(self):
+        if self._application.getPreferences().getValue("Nautilus/auto_status") is "No" and self.configVersionsMatch()== False:
+            return "Yes"
+        else:
+            return "No"
+
+
+    @pyqtProperty(str)
+    def profileUpdateStatus(self):
+        if self._application.getPreferences().getValue("Nautilus/install_status")=="uninstalled":
+            return "Profiles have been manually uninstalled"
+        elif self._application.getPreferences().getValue("Nautilus/profile_status") == "installed" and self.configVersionsMatch():
+            return "Profiles are up to date"
+        elif self._application.getPreferences().getValue("Nautilus/profile_status") != "installed" and self.configVersionsMatch():
+            return "New profiles have been downloaded. Click install plugin files."
+        elif not self.configVersionsMatch():
+            return "New profiles available"
+        else:
+            return "This is weird"
 
     def oldVersionInstalled(self):
         cura_dir=Resources.getStoragePathForType(Resources.Resources)
@@ -267,19 +303,38 @@ class Nautilus(QObject, MeshWriter, Extension):
 
     def configVersionsMatch(self):
         newVersion = json.loads(requests.get(self.gitUrl,auth=('zachrose@hydraresearch3d.com','Nautilus3d')).text)['tag_name']
-        installedVersion = self._application.getPreferences().getValue("Nautilus/configVersion")
+        installedVersion = self._application.getPreferences().getValue("Nautilus/configversion")
         if StrictVersion(installedVersion) == StrictVersion(newVersion):
             Logger.log("i","Some stuff, it's chill")
             return True
         else:
-            Logger.log("i","Some stuff, it's not chill")
-            self.configDownload()
+            Logger.log("i","No Bueno " + newVersion + " have " + installedVersion)
+            if self._application.getPreferences().getValue("Nautilus/install_status")!="uninstalled" and self._application.getPreferences().getValue("Nautilus/auto_status")!="Yes":
+                self._message = Message(catalog.i18nc("@info:status", "New Cura configuration is available for the Nautilus. \nTo enable automatic updates open Preferences under Extensions->Hydra Research Nautilus Plugin."), 0, False)
+                self._message.addAction("download_config", catalog.i18nc("@action:button", "Update"), "globe", catalog.i18nc("@info:tooltip", "Update Nautilus config."))
+                self._message.actionTriggered.connect(self._onMessageActionTriggered)
+                self._message.show()
+            elif self._application.getPreferences().getValue("Nautilus/auto_status")=="Yes":
+                self.configDownload()
+                Logger.log("i", "Auto-updating config")
+            else:
+                self._message = Message(catalog.i18nc("@info:status", "This is a strange situation."))
+                self._message.show()
             return False
 
+    def _onMessageActionTriggered(self, message, action):
+        if action == "download_config":
+            self.configDownload()
+
+    def _onDownloadComplete(self,versionNo):
+        if self._message:
+            self._message.hide()
+            self._message = None
+        Logger.log("i","display download confirmation")
+        self._message = Message(catalog.i18nc("@info:status", "Downloaded configuration version {}, restart Cura to install").format(versionNo))
+        self._message.show()
 
     def configDownload(self):
-        message = Message(catalog.i18nc("@info:status", "Downloading Config"))
-        message.show()
         configUrl = json.loads(requests.get(self.gitUrl,auth=('zachrose@hydraresearch3d.com','Nautilus3d')).text)['assets'][0]['browser_download_url']
         versionNo = json.loads(requests.get(self.gitUrl,auth=('zachrose@hydraresearch3d.com','Nautilus3d')).text)['tag_name']
         Logger.log("i", "Downloading from " + str(configUrl))
@@ -291,12 +346,13 @@ class Nautilus(QObject, MeshWriter, Extension):
             opener.addheaders = [('Accept','application/octet-stream')]
             urllib.request.install_opener(opener)
             urllib.request.urlretrieve(configUrl,os.path.join(self.this_plugin_path,'Nautilus.zip'))
-            self._application.getPreferences().setValue("Nautilus/configVersion", versionNo)
-            Logger.log("i","Config Downloaded")
+            self._application.getPreferences().setValue("Nautilus/configversion", versionNo)
+            Logger.log("i","Config Downloaded, set version " + versionNo)
+            self._onDownloadComplete(versionNo)
+            self._application.getPreferences().setValue("Nautilus/profile_status","downloaded")
         except Exception as inst:
             Logger.log("i","There was an error connecting to github")
-            for err in inst:
-                Logger.log("i",err)
+
 
     # check to see if the plugin files are all installed
     def isInstalled(self):
@@ -344,7 +400,7 @@ class Nautilus(QObject, MeshWriter, Extension):
     def changePluginInstallStatus(self, bInstallFiles):
         if bInstallFiles and not self.isInstalled():
             self.installPluginFiles()
-            message = Message(catalog.i18nc("@info:status", "Nautilus config files have been installed. Restart cura to complete installation"))
+            message = Message(catalog.i18nc("@info:status", "Nautilus configuration files have been installed. Restart cura to complete installation"))
             message.show()
         elif self.isInstalled():
             Logger.log("i","Uninstalling")
@@ -409,6 +465,7 @@ class Nautilus(QObject, MeshWriter, Extension):
                 # either way, the files are now installed, so set the prefrences value
                 self._application.getPreferences().setValue("Nautilus/install_status", "installed")
                 self._application.getPreferences().setValue("Nautilus/curr_version",Nautilus.version)
+                self._application.getPreferences().setValue("Nautilus/profile_status", "installed")
                 Logger.log("i", "Nautilus Plugin is now installed - Please restart ")
                 self._application.getPreferences().writeToFile(Resources.getStoragePath(Resources.Preferences, self._application.getApplicationName() + ".cfg"))
 
@@ -510,6 +567,8 @@ class Nautilus(QObject, MeshWriter, Extension):
                 message = Message(catalog.i18nc("@info:status","You have at least one Nautilus added into Cura. Remove it from your Preferences menu before restarting to avoid an error!"))
                 message.show()
             self._application.getPreferences().setValue("Nautilus/install_status", "uninstalled")
+            self._application.getPreferences().setValue("Nautilus/configversion", "0.0")
+            self._application.getPreferences().setValue("Nautilus/profile_status", "unknown")
             self._application.getPreferences().writeToFile(Resources.getStoragePath(Resources.Preferences, self._application.getApplicationName() + ".cfg"))
             message = Message(catalog.i18nc("@info:status", "Nautilus files have been uninstalled, please restart Cura to complete uninstallation."))
             message.show()
