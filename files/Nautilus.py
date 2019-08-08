@@ -302,7 +302,7 @@ class Nautilus(QObject, MeshWriter, Extension):
             return False
 
     def configVersionsMatch(self):
-        newVersion = json.loads(requests.get(self.gitUrl,auth=('zachrose@hydraresearch3d.com','Nautilus3d')).text)['tag_name']
+        newVersion = json.loads(requests.get(self.gitUrl).text)['tag_name']
         installedVersion = self._application.getPreferences().getValue("Nautilus/configversion")
         if StrictVersion(installedVersion) == StrictVersion(newVersion):
             Logger.log("i","Some stuff, it's chill")
@@ -335,8 +335,8 @@ class Nautilus(QObject, MeshWriter, Extension):
         self._message.show()
 
     def configDownload(self):
-        configUrl = json.loads(requests.get(self.gitUrl,auth=('zachrose@hydraresearch3d.com','Nautilus3d')).text)['assets'][0]['browser_download_url']
-        versionNo = json.loads(requests.get(self.gitUrl,auth=('zachrose@hydraresearch3d.com','Nautilus3d')).text)['tag_name']
+        configUrl = json.loads(requests.get(self.gitUrl,).text)['assets'][0]['browser_download_url']
+        versionNo = json.loads(requests.get(self.gitUrl,).text)['tag_name']
         Logger.log("i", "Downloading from " + str(configUrl))
         Logger.log("i", "Downloading to " + str(self.this_plugin_path))
         try:
