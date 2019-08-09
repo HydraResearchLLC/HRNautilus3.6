@@ -234,6 +234,11 @@ class Nautilus(QObject, MeshWriter, Extension):
             Logger.log("i","something's broken")
         return
 
+    @pyqtSlot()
+    def manualUpdate(self):
+        self.configDownload()
+        return
+
     @pyqtProperty(str)
     def getVersion(self):
         numba = Nautilus.version

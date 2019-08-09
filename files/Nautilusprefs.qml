@@ -94,7 +94,7 @@ UM.Dialog
           Button {
             id: manualup
             text: "Update Profiles"
-            onClicked: manager.manualUpdate
+            onClicked: manager.manualUpdate()
             anchors.horizontalCenter: parent.horizontalCenter
             visible: checkBooleanVals(manager.showUpdateButton)
 
