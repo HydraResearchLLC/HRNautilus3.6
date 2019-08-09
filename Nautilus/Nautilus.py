@@ -316,6 +316,9 @@ class Nautilus(QObject, MeshWriter, Extension):
             if self._application.getPreferences().getValue("Nautilus/auto_status")=="Yes":
                 self.configDownload()
                 Logger.log("i", "Auto-updating config")
+            else:
+                self._message = Message(catalog.i18nc("@info:status", "This is a strange situation."))
+                self._message.show()
             return False
 
     def _onMessageActionTriggered(self, message, action):
