@@ -12,8 +12,8 @@ UM.Dialog
     id: base
     property string installStatusText
 
-    minimumWidth: 450 * screenScaleFactor
-    minimumHeight: 500 * screenScaleFactor
+    minimumWidth: 500 * screenScaleFactor
+    minimumHeight: 700 * screenScaleFactor
     title: catalog.i18nc("@label", "Nautilus Plugin Preferences")
 
     function checkBooleanVals(val) {
@@ -25,7 +25,6 @@ UM.Dialog
             return val
         }
     }
-
     function checkInstallStatus(prefVal) {
         if(prefVal == "installed") {
             return "Nautilus profiles ARE installed"
@@ -81,7 +80,7 @@ UM.Dialog
             id: profstat
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: subtitle.bottom
-            text: manager.profileUpdateStatus
+            text: manager.profileUpdateStatus+": "+manager.configVersionNo
             anchors.margins: 10
           }
           CheckBox {
@@ -98,6 +97,18 @@ UM.Dialog
             anchors.horizontalCenter: parent.horizontalCenter
             visible: checkBooleanVals(manager.showUpdateButton)
 
+          }
+          Label {
+            id: warn
+            text: "WARNING! Pre-releases are experimental"
+            anchors.horizontalCenter: parent.horizontalCenter
+          }
+          Switch {
+            id: prerel
+            text: "Download pre-releases"
+            checked: checkBooleanVals(UM.Preferences.getValue("Nautilus/prerel_status"))
+            onClicked: manager.changePreStatus()
+            anchors.horizontalCenter: parent.horizontalCenter
           }
           /// profile check box etc. goes here
           MenuSeparator {
