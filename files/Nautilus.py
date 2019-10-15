@@ -89,9 +89,9 @@ class Nautilus(QObject, MeshWriter, Extension):
 
         self.this_plugin_path=os.path.join(Resources.getStoragePath(Resources.Resources), "plugins","Nautilus","Nautilus")
         self.gitUrl = 'https://api.github.com/repos/HydraResearchLLC/Nautilus-Config-Cura/releases/latest'
-        self.fullJson = json.loads(requests.get(self.gitUrl,auth=('zachrose@hydraresearch3d.com','64RBvqDFnPdo')).text)
+        self.fullJson = json.loads(requests.get(self.gitUrl).text)
         self.pregitUrl = 'https://api.github.com/repos/HydraResearchLLC/Nautilus-Config-Cura/releases'
-        self.preJson = json.loads(requests.get(self.pregitUrl,auth=('zachrose@hydraresearch3d.com','64RBvqDFnPdo')).text)
+        self.preJson = json.loads(requests.get(self.pregitUrl).text)
         self._preferences_window = None
 
         self._message = None
