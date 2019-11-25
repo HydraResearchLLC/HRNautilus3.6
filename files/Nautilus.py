@@ -208,6 +208,7 @@ class Nautilus(QObject, MeshWriter, Extension):
         if self._preferences_window is not None:
             self._preferences_window.hide()
 
+    @pyqtSlot()
     def welcome(self):
         Logger.log("i","Entering the WPM")
         wpm = HydraWelcome.HydraWelcome(CuraApplication)

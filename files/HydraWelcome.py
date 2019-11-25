@@ -74,6 +74,14 @@ class HydraWelcome(ListModel):
         Logger.log("i","crntpageindex"+str(self._crnt_page_index))
         return self._crnt_page_index
 
+    @pyqtSlot(result=str)
+    def ChangelogText(self) -> str:
+        Logger.log("i","Acquring changelog")
+        this_path = os.path.join(Resources.getStoragePath(Resources.Resources), "plugins","Nautilus","Nautilus")
+        changes = open(os.path.join(this_path,"Changelog.txt"),'r').read()
+        Logger.log("i","Going through changes "+str(type(changes)))
+        return changes
+
     # Returns a float number in [0, 1] which indicates the crnt progress.
     @pyqtProperty(float, notify = CrntPgIndexChange)
     def crntProgress(self) -> float:

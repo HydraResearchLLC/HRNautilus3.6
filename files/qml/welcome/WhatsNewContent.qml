@@ -21,7 +21,7 @@ Item
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         horizontalAlignment: Text.AlignHCenter
-        text: catalog.i18nc("@label", "What's new in Ultimaker Cura")
+        text: catalog.i18nc("@label", "What's new in the Hydra Research Plugin")
         color: UM.Theme.getColor("primary_button")
         font: UM.Theme.getFont("huge")
         renderType: Text.NativeRendering
@@ -40,7 +40,7 @@ Item
 
         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
-        textArea.text: CuraApplication.getTextManager().getChangeLogText()
+        textArea.text: manager.ChangelogText()
         textArea.textFormat: Text.RichText
         textArea.wrapMode: Text.WordWrap
         textArea.readOnly: true

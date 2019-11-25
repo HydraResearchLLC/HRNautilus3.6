@@ -143,6 +143,14 @@ UM.Dialog
                 onClicked: manager.showHelp()
                 //Layout.columnSpan:2
             }
+            Button{
+              id: welcomebutton
+              anchors.top:helpButtonbottom
+              anchors.margins: 10
+              anchors.horizontalCenter: parent.horizontalCenter
+              text: catalog.i18nc("@action:button", "Reload Welcome Flow")
+              onClicked: manager.welcome()
+            }
         } // end RowLayout
 
     } // end ColumnLayout
