@@ -210,6 +210,13 @@ class HydraWelcome(ListModel):
         Logger.log("i","shouldShowWelcomeFlow")
         return self._should_show_welcome_flow
 
+    @pyqtSlot()
+    def addNautilus(self) -> None:
+        Logger.log("i","Trying to add a Nautilus")
+        self._application.getInstance().getMachineManager().addMachine("hydra_research_nautilus")
+        #cura.Settings.MachineManager.addMachine
+        #id: hydra_research_nautilus
+
     # Gets the page index with the given page ID. If the page ID doesn't exist, returns None.
     def getPageIndexById(self, page_id: str) -> Optional[int]:
         Logger.log("i","getPageIndexById")
@@ -275,7 +282,7 @@ class HydraWelcome(ListModel):
                            "HRpage_url": self._getBuiltinWelcomePagePath("WhatsNewContent.qml"),
                            },
                           {"HRid": "cloud",
-                           "HRpage_url": self._getBuiltinWelcomePagePath("CloudContent.qml"),
+                           "HRpage_url": self._getBuiltinWelcomePagePath("AddNautilus.qml"),
                            },
                           ]
 
