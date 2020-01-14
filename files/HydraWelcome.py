@@ -1,4 +1,4 @@
-"HRpage_url"# Copyright (c) 2019 Ultimaker B.V.
+# Copyright (c) 2019 Ultimaker B.V.
 # Cura is released under the terms of the LGPLv3 or higher.
 from collections import deque
 import os
@@ -281,9 +281,12 @@ class HydraWelcome(ListModel):
                           {"HRid": "whats_new",
                            "HRpage_url": self._getBuiltinWelcomePagePath("WhatsNewContent.qml"),
                            },
-                          {"HRid": "cloud",
+                          {"HRid": "add",
                            "HRpage_url": self._getBuiltinWelcomePagePath("AddNautilus.qml"),
                            },
+                           {"HRid": "duet",
+                           "HRpage_url": self._getBuiltinWelcomePagePath("NautilusDuetWelcome.qml"),
+                           }
                           ]
 
         pages_to_show = all_pages_list
