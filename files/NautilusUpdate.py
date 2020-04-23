@@ -28,6 +28,7 @@ class NautilusUpdate(MachineAction, QObject):#, Extension, OutputDevicePlugin):
         super().__init__("NautilusUpdate", catalog.i18nc("@action", "Update Firmware"))
         self._qml_url = os.path.join(Resources.getStoragePath(Resources.Resources), "plugins","Nautilus","Nautilus",'qml','NautilusUpdate.qml')
         self.updatePrinter = ''
+        self.zipPath = ''
         Logger.log('i','jkll')
         CuraApplication.getInstance().getPreferences().addPreference("Nautilus/instances", json.dumps({}))
         self._instances = json.loads(CuraApplication.getInstance().getPreferences().getValue("Nautilus/instances"))
@@ -52,6 +53,9 @@ class NautilusUpdate(MachineAction, QObject):#, Extension, OutputDevicePlugin):
         #Logger.log("i", "Creating Nautilus preferences UI ")
         #self._application.createQmlComponent(path, {"manager": self}).show()
         NautilusDuet.NautilusDuet().thingsChanged()
+
+    def getZipPath(self):
+        return self.zipPath
 
     @pyqtSlot(str)
     def setUpdatePrinter(self, name):
@@ -126,6 +130,7 @@ class NautilusUpdate(MachineAction, QObject):#, Extension, OutputDevicePlugin):
         Logger.log('d','received path: '+str(path))
         if os.path.exists(path):
             Logger.log('d','Valid!')
+            self.zipPath = path
             return True
         else:
             Logger.log('d','Invalid!')

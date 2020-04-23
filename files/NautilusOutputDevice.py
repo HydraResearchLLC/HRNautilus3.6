@@ -73,8 +73,9 @@ class NautilusOutputDevice(OutputDevice):
         self._http_user = http_user
         self._http_password = http_password
         self._firmware_version = firmware_version
-        self.gitUrl = 'https://api.github.com/repos/HydraResearchLLC/Nautilus-Configuration-Macros/releases/latest'
+
         self.path = os.path.join(Resources.getStoragePath(Resources.Resources), "plugins","Nautilus","Nautilus")
+        self.zipPath = NautilusUpdate.NautilusUpdate().getZipPath()
         #RESOLVE FLAG ISSUE
         self.Nauti = Nautilus.Nautilus()
 
@@ -173,7 +174,7 @@ class NautilusOutputDevice(OutputDevice):
             self.macRequest.setRawHeader(b'Accept', b'application/json, text/javascript')
             self.macRequest.setRawHeader(b'Connection', b'keep-alive')
 
-            #self.gitRequest.setRawHeader(b"User-Agent", b"Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.9.1.7) Gecko/20091221 Firefox/3.5.7 (.NET CLR 3.5.30729)")
+
             self.macroReply = self._qnam.get(self.macRequest)
             loop = QEventLoop()
             self.macroReply.finished.connect(loop.quit)
@@ -236,7 +237,10 @@ class NautilusOutputDevice(OutputDevice):
             if 'i' in status.lower():
                 Logger.log('d', 'update under normal conditions. Status: '+status)
                 self._send('gcode', [("gcode", 'M291 P\"Do not power off your printer or close Cura until updates complete\" R\"Update Alert\" S0 T0')])
-                self.githubRequest()
+                loop = QEventLoop()
+                self._reply.finished.connect(loop.quit)
+                loop.exec_()
+                self.updateFirmware()
             else:
                 message = Message(catalog.i18nc("@info:status","{} is busy, unable to update").format(self._name))
                 message.show()
@@ -259,46 +263,30 @@ class NautilusOutputDevice(OutputDevice):
             else:
                 return False
 
-
-    def githubRequest(self):
+    def updateFirmware(self):
         #self.writeError.connect(self.updateError())
         self._progress = Message(catalog.i18nc("@info:progress", "Do not power off printer or close Cura until updates complete \n Updating {} \n").format(self._name), 0, False, 1)
         self._progress.show()
         self._warning = Message(catalog.i18nc("@info:status","Do not power off printer or close Cura until updates complete"), 0, False)
         self._warning.show()
-        Logger.log('i','query github')
+        Logger.log('i','Time to update firmware!')
         self._stage = OutputStage.ready
-
         try:
-            #self.nam = QtNetwork.QNetworkAccessManager()
-            self.gitRequest = QtNetwork.QNetworkRequest(QUrl(self.gitUrl))
-            debugstatement = self.gitRequest.url().toString()
-            Logger.log('i','debug: '+debugstatement)
-            #self.gitRequest.setRawHeader(b"User-Agent", b"Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.9.1.7) Gecko/20091221 Firefox/3.5.7 (.NET CLR 3.5.30729)")
-            self.gitReply = self._qnam.get(self.gitRequest)
-            loop = QEventLoop()
-            self.gitReply.finished.connect(loop.quit)
-            loop.exec_()
-            response = bytes(self.gitReply.readAll()).decode()
-
-            Logger.log('i','123 '+str(len(response)))
-            #self._qnam.finished.connect(self.githubDownload())
-            macroUrl = json.loads(response)['assets'][1]['browser_download_url']
-            configUrl = json.loads(response)['assets'][0]['browser_download_url']
-            Logger.log("i",'gettin macros from '+str(macroUrl))
-            resp = requests.get(macroUrl, self.path, allow_redirects=True)
-            self.updProg = 0
-            open(os.path.join(self.path,'Nautilus_macros.zip'), 'wb').write(resp.content)
+            with zipfile.ZipFile(zipdata, "r") as zip_ref:
+                for info in zip_ref.infolist():
+                    if 'config' in info.filename:
+                        folder = os.path.realpath(os.path.join(self.path,'Nautilus_config.zip'))
+                    elif 'macro' in info.filename:
+                        folder = os.path.realpath(os.path.join(self.path,'Nautilus_macros.zip'))
+                    if info.filename.endswith('zip'):
+                        extracted_path = zip_ref.extract(info.filename, path = folder)
+                        permissions = os.stat(extracted_path).st_mode
+                        os.chmod(extracted_path, permissions | stat.S_IEXEC)
             self.deleteMacros()
-            #don't forget this
-            respo = requests.get(configUrl, self.path, allow_redirects=True)
-            open(os.path.join(self.path,'Nautilus_config.zip'),'wb').write(respo.content)
-            Logger.log("i",'gettin config from '+str(configUrl))
-            self.updateConfig(configUrl)
+            self.updateConfig()
             self.updateComplete()
         except:
-            Logger.log("i","somethings goofed! "+str(traceback.format_exc()))
-
+            self._onZipError()
 
     def deleteMacros(self):
         if self._stage != OutputStage.ready:
@@ -308,6 +296,7 @@ class NautilusOutputDevice(OutputDevice):
         Logger.log('i', 'Dirs: '+str(self._dirStruct))
         for mac in self._macStruct:
             Logger.log('i','1')
+            #Check for header here
             self._send('delete',[('name',"0:/"+mac),self._timestamp()], self.onMacroDeleted)
             sleep(.1)
         for dir in self._dirStruct:
@@ -362,7 +351,6 @@ class NautilusOutputDevice(OutputDevice):
         Logger.log('i','time to upload the macro')
         #if self._stage != OutputStage.writing:
         #    return
-
         Logger.log("d", self._name_id + " | Uploading... | "+str(self._fileName))
         self._streamer.seek(0)
         self._posterData = QByteArray()
@@ -372,7 +360,7 @@ class NautilusOutputDevice(OutputDevice):
         self._reply.finished.connect(loop.quit)
         loop.exec()
 
-    def updateConfig(self, url):
+    def updateConfig(self):
         self._stage = OutputStage.ready
         self.writeStarted.emit(self)
 
@@ -717,6 +705,12 @@ class NautilusOutputDevice(OutputDevice):
         message.addAction("download_config", catalog.i18nc("@action:button", "Update Firmware"), "globe", catalog.i18nc("@info:tooltip", "Automatically download and install the latest firmware"))
         message.actionTriggered.connect(self.beginUpdate)
         message.show()
+
+    def _onZipError(self):
+        self._progress.hide()
+        self._warning.hide()
+        self._warning = Message(catalog.i18nc("@info:progress", "Error finding firmware zip").format(self._name), 0, False, 1)
+        self._warning.show()
 
 """
 FUNCTION GRAVEYARD

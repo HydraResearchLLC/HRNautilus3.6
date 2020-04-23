@@ -147,7 +147,7 @@ Cura.MachineAction
                   anchors.topMargin: 20
                   anchors.rightMargin:10
                   text: "Yes"
-                  onClicked: {manager.updateConfirm(), confirmationDialog.close()}
+                  onClicked: {confirmationDialog.close(), manager.updateConfirm()}
                 }
 
                 Cura.SecondaryButton{
