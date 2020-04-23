@@ -41,7 +41,10 @@ class NautilusUpdate(MachineAction, QObject):#, Extension, OutputDevicePlugin):
         self.data = list(self._instances.keys())
         #Logger.log('i','This is the guy: '+str(data))
         self._instances = json.loads(CuraApplication.getInstance().getPreferences().getValue("Nautilus/instances"))
-        return self.data
+        if self.data:
+            return self.data
+        else:
+            return []
 
     def thingsChanged(self):
         self.firmwareListChanged.emit()
@@ -130,8 +133,11 @@ class NautilusUpdate(MachineAction, QObject):#, Extension, OutputDevicePlugin):
 
     @pyqtSlot(str, result = bool)
     def statusCheck(self, name):
-        if len(name)<1:
-            name = self.data[0]
+        if self.data:
+            if len(name)<1:
+                name = self.data[0]
+        else:
+            return False
         Logger.log('d','were gettin '+str(name))
         try:
             return NautilusDuet.NautilusDuet().statusCheck(name)
