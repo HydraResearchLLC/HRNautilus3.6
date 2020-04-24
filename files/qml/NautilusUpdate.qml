@@ -91,6 +91,7 @@ Cura.MachineAction
                     Layout.column: 2;
                     onTextChanged: {
                         dialog.validPath = manager.validPath(pathField.text);
+                        manager.setZipPath(fileDialog.fileUrl);
                       }
         }
 
@@ -118,7 +119,7 @@ Cura.MachineAction
         anchors.horizontalCenter: parent.horizontalCenter
         text: "Update"
         enabled: dialog.validPath && dialog.connectedPrinter
-        onClicked: {confirmationDialog.open(); manager.setUpdatePrinter(instanceList.currentText);}
+        onClicked: {confirmationDialog.open(); manager.setUpdatePrinter(instanceList.currentText); manager.setZipPath(pathField.text);}
       }
 
         }
@@ -176,9 +177,9 @@ Cura.MachineAction
           folder: CuraApplication.getDefaultPath("dialog_load_path")
           nameFilters: [ "Zip files (*.zip)"]
           onAccepted: {
+              fileDialog.close();
               selectedPath: fileDialog.fileUrl;
               manager.setZipPath(fileDialog.fileUrl);
-              fileDialog.close();
           }
           onRejected: {
               fileDialog.close()

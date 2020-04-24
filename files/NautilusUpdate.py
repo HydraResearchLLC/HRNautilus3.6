@@ -28,10 +28,12 @@ class NautilusUpdate(MachineAction, QObject):#, Extension, OutputDevicePlugin):
         super().__init__("NautilusUpdate", catalog.i18nc("@action", "Update Firmware"))
         self._qml_url = os.path.join(Resources.getStoragePath(Resources.Resources), "plugins","Nautilus","Nautilus",'qml','NautilusUpdate.qml')
         self.updatePrinter = ''
-        self.zipPath = ''
         Logger.log('i','jkll')
         CuraApplication.getInstance().getPreferences().addPreference("Nautilus/instances", json.dumps({}))
         self._instances = json.loads(CuraApplication.getInstance().getPreferences().getValue("Nautilus/instances"))
+        for name, instance in self._instances.items():
+            if "firmware_version" not in instance:
+                instance["firmware_version"]='1.0'
         #self.firmwareListChanged.connect(self.instanceFirmwareVersionString)
         #self.firmwareListChanged.connect(self.needsUpdateString)
 
@@ -54,18 +56,15 @@ class NautilusUpdate(MachineAction, QObject):#, Extension, OutputDevicePlugin):
         #self._application.createQmlComponent(path, {"manager": self}).show()
         NautilusDuet.NautilusDuet().thingsChanged()
 
-    def getZipPath(self):
-        return self.zipPath
-
     @pyqtSlot(str)
     def setUpdatePrinter(self, name):
         self.updatePrinter = name
 
     @pyqtSlot()
     def updateConfirm(self):
-        Logger.log('i','updateconfirm')
+        Logger.log('i','updateconfirm' + str(self.zipPath))
         if self.updatePrinter in self._instances.keys():
-            NautilusDuet.NautilusDuet().updateButton(self.updatePrinter)
+            NautilusDuet.NautilusDuet().updateButton(self.updatePrinter, self.zipPath)
         else:
             mess = Message("@info","There was an error!")
             mess.show()
@@ -122,7 +121,8 @@ class NautilusUpdate(MachineAction, QObject):#, Extension, OutputDevicePlugin):
 
     @pyqtSlot(str)
     def setZipPath(self, path):
-        Logger.log('d','received path: '+str(path))
+        self.zipPath = os.path.abspath(path[7:])
+        Logger.log('d','set path: '+str(self.zipPath))
 
     @pyqtSlot(str, result=bool)
     def validPath(self,path):
@@ -130,11 +130,11 @@ class NautilusUpdate(MachineAction, QObject):#, Extension, OutputDevicePlugin):
         Logger.log('d','received path: '+str(path))
         if os.path.exists(path):
             Logger.log('d','Valid!')
-            self.zipPath = path
             return True
         else:
             Logger.log('d','Invalid!')
             return False
+
 #make this a signal? use serverlist?
     @pyqtSlot(str, result = bool)
     def statusCheck(self, name):

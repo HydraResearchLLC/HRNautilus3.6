@@ -52,7 +52,6 @@ class NautilusDuet(MachineAction, QObject, Extension, OutputDevicePlugin):
             for name, instance in self._instances.items():
                 instance["firmware_version"]='1.0'
 
-
     def start(self):
         manager = self.getOutputDeviceManager()
         for name, instance in self._instances.items():
@@ -88,10 +87,10 @@ class NautilusDuet(MachineAction, QObject, Extension, OutputDevicePlugin):
         return list(self._instances.keys())
 
     @pyqtSlot(str)
-    def updateButton(self, name):
+    def updateButton(self, name, zipPath):
         Logger.log('i','we go!')
         if name in self._instances.keys():
-            NautilusOutputDevice.NautilusOutputDevice(name, self._instances[name]["url"], self._instances[name]["duet_password"], self._instances[name]["http_user"], self._instances[name]["http_password"], self._instances[name]["firmware_version"], device_type=NautilusOutputDevice.DeviceType.upload).beginUpdate(None, None)
+            NautilusOutputDevice.NautilusOutputDevice(name, self._instances[name]["url"], self._instances[name]["duet_password"], self._instances[name]["http_user"], self._instances[name]["http_password"], self._instances[name]["firmware_version"], device_type=NautilusOutputDevice.DeviceType.upload).beginUpdate(None, None, zipPath)
         return None
 
     @pyqtSlot(str)

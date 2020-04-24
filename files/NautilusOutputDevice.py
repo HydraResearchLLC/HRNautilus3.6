@@ -75,7 +75,7 @@ class NautilusOutputDevice(OutputDevice):
         self._firmware_version = firmware_version
 
         self.path = os.path.join(Resources.getStoragePath(Resources.Resources), "plugins","Nautilus","Nautilus")
-        self.zipPath = NautilusUpdate.NautilusUpdate().getZipPath()
+
         #RESOLVE FLAG ISSUE
         self.Nauti = Nautilus.Nautilus()
 
@@ -209,7 +209,7 @@ class NautilusOutputDevice(OutputDevice):
                 Logger.log('i',"what in tarnation")
         Logger.log("i",'big done!')
 
-    def beginUpdate(self, message, action):
+    def beginUpdate(self, message, action, zipPath):
         if message:
             message.hide()
         self._send('connect', [("password", self._duet_password), self._timestamp()])
@@ -218,12 +218,12 @@ class NautilusOutputDevice(OutputDevice):
         self._reply.finished.connect(loop.quit)
         loop.exec_()
         if self._reply:
-            self.onConnected()
+            self.onConnected(zipPath)
         else:
             Logger.log('d','no reply item')
             self._onTimeout()
 
-    def onConnected(self):
+    def onConnected(self,zipPath):
         self._send('status', [("type", '3')])
         loop = QEventLoop()
         self._reply.finished.connect(loop.quit)
@@ -236,11 +236,14 @@ class NautilusOutputDevice(OutputDevice):
             status = json.loads(reply_body)["status"]
             if 'i' in status.lower():
                 Logger.log('d', 'update under normal conditions. Status: '+status)
-                self._send('gcode', [("gcode", 'M291 P\"Do not power off your printer or close Cura until updates complete\" R\"Update Alert\" S0 T0')])
+                self._reply = None
+                self._send('gcode', [("gcode", "M291 P\"Do not power off your printer or close Cura until updates complete\" R\"Update Alert\" S0 T60")])
                 loop = QEventLoop()
                 self._reply.finished.connect(loop.quit)
                 loop.exec_()
-                self.updateFirmware()
+                eply_body = bytes(self._reply.readAll()).decode()
+                Logger.log("d", str(len(eply_body)) + " | The reply is: | " + eply_body)
+                self.updateFirmware(zipPath)
             else:
                 message = Message(catalog.i18nc("@info:status","{} is busy, unable to update").format(self._name))
                 message.show()
@@ -267,43 +270,68 @@ class NautilusOutputDevice(OutputDevice):
             else:
                 return False
 
-    def updateFirmware(self):
+    def updateFirmware(self, zipPath):
         #self.writeError.connect(self.updateError())
+        Logger.log('d', 'we have: '+str(zipPath))
         self._progress = Message(catalog.i18nc("@info:progress", "Do not power off printer or close Cura until updates complete \n Updating {} \n").format(self._name), 0, False, 1)
         self._progress.show()
         self._warning = Message(catalog.i18nc("@info:status","Do not power off printer or close Cura until updates complete"), 0, False)
         self._warning.show()
+        self.updProg = 0
         Logger.log('i','Time to update firmware!')
         self._stage = OutputStage.ready
         try:
-            with zipfile.ZipFile(zipdata, "r") as zip_ref:
+            with zipfile.ZipFile(zipPath, "r") as zip_ref:
                 for info in zip_ref.infolist():
-                    if 'config' in info.filename:
-                        folder = os.path.realpath(os.path.join(self.path,'Nautilus_config.zip'))
-                    elif 'macro' in info.filename:
-                        folder = os.path.realpath(os.path.join(self.path,'Nautilus_macros.zip'))
-                    if info.filename.endswith('zip'):
+                    Logger.log('i',"looking at: "+info.filename)
+                    folder = None
+                    if 'config' in info.filename.lower():
+                        Logger.log('d','unpacking config: '+info.filename + " to "+self.path)
+                        folder = self.path
+                        Logger.log('d', "the folder is "+str(folder))
+                    elif 'macro' in info.filename.lower():
+                        Logger.log('d','unpacking macros: '+info.filename)
+                        folder = self.path
+
+                    Logger.log('d', "the folder is "+str(folder))
+                    if folder is not None:
+                        Logger.log('d','extracting: '+str(folder))
                         extracted_path = zip_ref.extract(info.filename, path = folder)
                         permissions = os.stat(extracted_path).st_mode
                         os.chmod(extracted_path, permissions | stat.S_IEXEC)
+
             self.deleteMacros()
             self.updateConfig()
             self.updateComplete()
-        except:
+        except Exception as err:
+            Logger.log('i',"oopsie! "+str(err))
             self._onZipError()
 
     def deleteMacros(self):
+        macroForDelete = []
         if self._stage != OutputStage.ready:
             raise OutputDeviceError.DeviceBusyError()
         self.fileStructer(self._url, 'macros')
         Logger.log('i', 'Macs: '+ str(self._macStruct))
         Logger.log('i', 'Dirs: '+str(self._dirStruct))
         for mac in self._macStruct:
-            Logger.log('i','1')
-            #Check for header here
+            self._send('download', [("name", "0:/"+mac)])
+            loop = QEventLoop()
+            getTimer = QTimer()
+            self._reply.finished.connect(loop.quit)
+            loop.exec()
+            if self._reply:
+                reply_body = bytes(self._reply.readAll()).decode().strip()
+                if reply_body.startswith('; Macro for the Nautilus'):
+                    Logger.log('i',str(reply_body))
+                    macroForDelete.append(mac)
+            else:
+                Logger.log('e',mac+"didn't download right")
+        for mac in macroForDelete:
             self._send('delete',[('name',"0:/"+mac),self._timestamp()], self.onMacroDeleted)
             sleep(.1)
         for dir in self._dirStruct:
+            #at some point filter out dirs for macros in folders
             Logger.log('i','1')
             self._send('delete',[('name',"0:/"+dir),self._timestamp()], self.onMacroDeleted)
             sleep(.1)
@@ -313,7 +341,9 @@ class NautilusOutputDevice(OutputDevice):
         self._stage = OutputStage.writing
         self.writeStarted.emit(self)
 
-        zipdata = os.path.join(self.path,'Nautilus_macros.zip')
+        macroName = [file for file in os.listdir(self.path) if 'macro' in file.lower()]
+        zipdata = os.path.join(self.path, macroName[len(macroName)-1])
+        Logger.log('i',"Unpacking "+zipdata)
         with zipfile.ZipFile(zipdata, "r") as zip_ref:
             with tempfile.TemporaryDirectory() as folder:
                 for info in zip_ref.infolist():
@@ -368,8 +398,9 @@ class NautilusOutputDevice(OutputDevice):
         self._stage = OutputStage.ready
         self.writeStarted.emit(self)
 
-        #unpack zip as in update Macros
-        zipdata = os.path.join(self.path,'Nautilus_config.zip')
+        configName = [file for file in os.listdir(self.path) if 'config' in file.lower()]
+        zipdata = os.path.join(self.path, configName[len(configName)-1])
+        Logger.log('i',"Unpacking "+str(configName))
         with zipfile.ZipFile(zipdata, "r") as zip_ref:
             with tempfile.TemporaryDirectory() as folder:
                 for info in zip_ref.infolist():
@@ -422,8 +453,8 @@ class NautilusOutputDevice(OutputDevice):
 
     def firmwareInstall(self):
         self._stage = OutputStage.writing
-        #FIX THIS
-        self._send('gcode', [("gcode", 'M997 S0:1:2')])
+
+        self._send('gcode', [("gcode", 'M997 S0:1')])
         sleep(.1)
         self._stage = OutputStage.ready
 
@@ -494,10 +525,12 @@ class NautilusOutputDevice(OutputDevice):
     def updateComplete(self):
         self._message = Message(catalog.i18nc("@info:progress", "Update Complete! Printer restarting..."))
         self._message.show()
-        self._warning.hide()
-        self._warning = None
-        self._progress.hide()
-        self._progress = None
+        if self._warning is not None:
+            self._warning.hide()
+            self._warning = None
+        if self._progress is not None:
+            self._progress.hide()
+            self._progress = None
         QTimer.singleShot(15000, self.updateCheck)
 
     def updateError(self, errorCode):
@@ -705,14 +738,18 @@ class NautilusOutputDevice(OutputDevice):
 
     def _onUpdateRequired(self):
         #NautilusUpdate.NautilusUpdate().thingsChanged()
-        message=Message(catalog.i18nc("@info:status", "New features are available for {}! It is recommended to update the firmware on your printer.").format(self._name), 0)
+        message=Message(catalog.i18nc("@info:status", "New features are available for {}! It is recommended to update the firmware on your printer. But this button is broken rn").format(self._name), 0)
         message.addAction("download_config", catalog.i18nc("@action:button", "Update Firmware"), "globe", catalog.i18nc("@info:tooltip", "Automatically download and install the latest firmware"))
-        message.actionTriggered.connect(self.beginUpdate)
+        message.actionTriggered.connect(self.beginUpdate)#redirect to start machine action
         message.show()
 
     def _onZipError(self):
-        self._progress.hide()
-        self._warning.hide()
+        if self._progress is not None:
+            self._progress.hide()
+            self._progress = None
+        if self._warning is not None:
+            self._warning.hide()
+            self._warning = None
         self._warning = Message(catalog.i18nc("@info:progress", "Error finding firmware zip").format(self._name), 0, False, 1)
         self._warning.show()
 
