@@ -48,6 +48,9 @@ class NautilusDuet(MachineAction, QObject, Extension, OutputDevicePlugin):
 
         CuraApplication.getInstance().getPreferences().addPreference("Nautilus/instances", json.dumps({}))
         self._instances = json.loads(CuraApplication.getInstance().getPreferences().getValue("Nautilus/instances"))
+        if "firmware_version" not in self._instances:
+            for name, instance in self._instances.items():
+                instance["firmware_version"]='1.0'
 
 
     def start(self):
