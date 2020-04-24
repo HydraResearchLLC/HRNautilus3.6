@@ -17,7 +17,7 @@ Cura.MachineAction
     property int defaultVerticalMargin: UM.Theme.getSize("default_margin").height;
     property int defaultHorizontalMargin: UM.Theme.getSize("default_margin").width;
     property string selectedPath: CuraApplication.getDefaultPath("dialog_load_path")
-    property bool validPath: true
+    property bool validPath: false
     property bool connectedPrinter: true
     property int usefulWidth: 350 * screenScaleFactor
 
@@ -41,51 +41,54 @@ Cura.MachineAction
             fill: parent;
             topMargin: parent.defaultVerticalMargin
                 }
-
-        Row {
+          Label{id: title; font: UM.Theme.getFont("large_bold"); text: "Update Firmware"}
+          Label {id:instructions; anchors.top: title.bottom; anchors.topMargin: 20; text: "1. Select your printer from the dropdown menu\n2. Find NautilusFirmware.hrpp by typing the path or clicking Browse\n3. If your Nautilus is connected, press \"Update\". Your Nautilus will not be usable for the duration of the update." }
+        GridLayout {
           id: printerRow;
-          spacing: 5;
-          anchors { top: parent.top
+          columns: 3
+          rows: 5
+          //spacing: 5;
+          anchors { top: instructions.bottom
                     //left: printerRow.left
-                    horizontalCenter: parent.horizontalCenter
-                    margins: 40
+                    left: parent.left
+                    right: parent.right
+                    margins: 100
           }
 
-          Label {anchors.verticalCenter: printerRow.verticalCenter; text: "Select Printer: "}
+          Label {id: selectLabel; Layout.row: 1; Layout.column: 1; text: "Select Printer: "}
 
           ComboBox{
-              id: instanceList
-              anchors.verticalCenter: printerRow.verticalCenter;
+              id: instanceList;
+              Layout.row: 1;
+              Layout.column: 2;
+              anchors.verticalCenter: selectLabel.verticalCenter;
               model: manager.serverList;
               onCurrentIndexChanged: { dialog.connectedPrinter = manager.statusCheck(currentText);}
             }
-
+          Label{
+            text: "Status:"
+            Layout.row: 2;
+            Layout.column: 1;
+          }
           Label {
-            text: "Printer is not connected";
-            anchors.leftMargin: 30;
-            anchors.verticalCenter: printerRow.verticalCenter;
-            visible: !dialog.connectedPrinter;
+            text: dialog.connectedPrinter ? "Ready" : "Disconnected";
+            Layout.row: 2;
+            Layout.column: 2;
+            //visible: !dialog.connectedPrinter;
+            font.bold: true
 
           }
-        }
 
-        Row {
-          id: firmRow;
-          spacing: 5;
-          anchors { top: printerRow.top
-                    horizontalCenter: parent.horizontalCenter
-                    //left: parent.left
-                    margins: 40
-          }
 
-          Label {anchors.verticalCenter: firmRow.verticalCenter; text: "Firmware Zip: "}
+          Label {Layout.row: 3; Layout.column: 1; text: "Firmware Zip: "}
 
           TextField {
                     id: pathField
                     placeholderText: "Enter path or click Browse"
                     text: fileDialog.fileUrl;
-                    width: usefulWidth;
-                    anchors.verticalCenter: firmRow.verticalCenter;
+                    Layout.preferredWidth: usefulWidth;
+                    Layout.row: 3;
+                    Layout.column: 2;
                     onTextChanged: {
                         dialog.validPath = manager.validPath(pathField.text);
                       }
@@ -93,23 +96,28 @@ Cura.MachineAction
 
           Cura.SecondaryButton {
             text: "Browse";
-            anchors.verticalCenter: firmRow.verticalCenter;
-            //anchors.horizontalCenter: firmRow.horizontalCenter;
-            anchors.leftMargin: 20
+            Layout.row: 3;
+            Layout.column: 3;
             onClicked: fileDialog.open()}
-        }
+
         Label{ text: "Invalid Path! ";
-              anchors{
-                top: firmRow.bottom
-                horizontalCenter: parent.horizontalCenter
-              }
+              Layout.row: 4;
+              Layout.column: 2;
               visible: !dialog.validPath
       }
+      }
+      Label { anchors.bottom:updateButton.top;
+              text: !dialog.validpath && !dialog.connectedPrinter ? "Invalid path and Nautilus not connected" : !dialog.validpath && dialog.connectedPrinter ? "Invalid path, but the printer is connected" :  "Printer disconnected, but the path is valid";
+              visible: !(dialog.validPath && dialog.connectedPrinter);
+
+            }
+
       Cura.PrimaryButton {
+        id: updateButton
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         text: "Update"
-        enabled: dialog.validPath //&& dialog.connectedPrinter
+        enabled: dialog.validPath && dialog.connectedPrinter
         onClicked: {confirmationDialog.open(); manager.setUpdatePrinter(instanceList.currentText);}
       }
 

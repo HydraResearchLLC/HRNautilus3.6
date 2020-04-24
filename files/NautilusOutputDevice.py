@@ -246,17 +246,21 @@ class NautilusOutputDevice(OutputDevice):
                 message.show()
 
     def checkPrinterStatus(self):
+        self._stage = OutputStage.writing
         self._send('status', [("type", '3')])
         loop = QEventLoop()
         self._reply.finished.connect(loop.quit)
-        getTimer.singleShot(3000, loop.quit)
+        QTimer.singleShot(2000, loop.quit)
         loop.exec_()
+        Logger.log('i','Checking status on: '+self._name)
         reply_body = bytes(self._reply.readAll()).decode()
         Logger.log("d", str(len(reply_body)) + " | The reply is: | " + reply_body)
         if len(reply_body)==0:
+            Logger.log('i','status timeout')
             self._onTimeout()
             return False
         else:
+            Logger.log('i', 'got reply')
             status = json.loads(reply_body)["status"]
             if 'i' in status.lower():
                 return True

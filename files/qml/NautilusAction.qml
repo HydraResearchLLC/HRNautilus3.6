@@ -108,14 +108,13 @@ Cura.MachineAction
 
               delegate: Rectangle {
                   width: parent.width;
-                  height: 20;
-                  color: ListView.isCurrentItem ? palette.highlight : index % 2 ? palette.base : palette.alternateBase;
+                  height: childrenRect.height;
+                  color: ListView.isCurrentItem ? "#3E4AFC" : index % 2 ? palette.alternateBase : palette.base;
                   property string name: modelData.toString();
 
                   Text {
-                      text: "   " + name;
-                      anchors.verticalCenter: parent.verticalCenter;
-                      // color: wrapper.ListView.isCurrentItem ? "white" : "black" ##This did not work, but should
+                      text: name;
+                      color: parent.ListView.isCurrentItem ? "white" : "black"
                   }
 
                   MouseArea {

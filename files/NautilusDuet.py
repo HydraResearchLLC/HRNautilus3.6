@@ -76,6 +76,7 @@ class NautilusDuet(MachineAction, QObject, Extension, OutputDevicePlugin):
 
     def statusCheck(self, name):
         if name in self._instances.keys():
+            Logger.log('i',"checkin on "+str(name))
             return NautilusOutputDevice.NautilusOutputDevice(name, self._instances[name]["url"], self._instances[name]["duet_password"], self._instances[name]["http_user"], self._instances[name]["http_password"], self._instances[name]["firmware_version"], device_type=NautilusOutputDevice.DeviceType.upload).checkPrinterStatus()
 
     serverListChanged = pyqtSignal()

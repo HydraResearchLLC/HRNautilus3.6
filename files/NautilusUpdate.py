@@ -135,7 +135,7 @@ class NautilusUpdate(MachineAction, QObject):#, Extension, OutputDevicePlugin):
         else:
             Logger.log('d','Invalid!')
             return False
-
+#make this a signal? use serverlist?
     @pyqtSlot(str, result = bool)
     def statusCheck(self, name):
         if self.data:
@@ -146,7 +146,8 @@ class NautilusUpdate(MachineAction, QObject):#, Extension, OutputDevicePlugin):
         Logger.log('d','were gettin '+str(name))
         try:
             return NautilusDuet.NautilusDuet().statusCheck(name)
-        except:
+        except Exception as err:
+            Logger.log('i','exception! '+str(err))
             return False
 
 """

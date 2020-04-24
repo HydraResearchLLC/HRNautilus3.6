@@ -39,6 +39,7 @@ def fileList(fileName):
         files += [os.path.join(dirpath, file) for file in filenames]
     return files
 
+print("Don't forget to correct plugin name at release!")
 print("Do you want intent profiles? y or n ")
 flag = str(input())
 
